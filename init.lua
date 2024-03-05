@@ -87,8 +87,11 @@ P.S. You can delete this when you're done too. It's your config now! :)
 -- Set <space> as the leader key
 -- See `:help mapleader`
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
+require 'custom.globals'
+
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
+vim.o.termguicolors = true
 
 -- [[ Setting options ]]
 -- See `:help vim.opt`
@@ -150,6 +153,9 @@ vim.opt.scrolloff = 10
 
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
+vim.keymap.set({ 'n', 'v' }, '<leader>y', '"+y', { silent = true })
+vim.keymap.set({ 'n', 'v' }, '<leader>p', '"_dP', { silent = true })
+vim.keymap.set({ 'n', 'v' }, '<leader>d', '"_d', { silent = true })
 
 -- Set highlight on search, but clear on pressing <Esc> in normal mode
 vim.opt.hlsearch = true
@@ -219,6 +225,9 @@ vim.opt.rtp:prepend(lazypath)
 --
 -- NOTE: Here is where you install your plugins.
 require('lazy').setup {
+
+  -- [[ Plugin Specs list ]]
+  'nvimtools/none-ls.nvim',
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
   'tpope/vim-sleuth', -- Detect tabstop and shiftwidth automatically
 
@@ -531,9 +540,45 @@ require('lazy').setup {
       --  - settings (table): Override the default settings passed when initializing the server.
       --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
       local servers = {
-        -- clangd = {},
-        -- gopls = {},
-        -- pyright = {},
+        clangd = {},
+        gopls = {
+          root_dir = function(fname)
+            local Path = require 'plenary.path'
+
+            local absolute_cwd = Path:new(vim.loop.cwd()):absolute()
+            local absolute_fname = Path:new(fname):absolute()
+
+            if string.find(absolute_cwd, '/cmd/', 1, true) and string.find(absolute_fname, absolute_cwd, 1, true) then
+              return absolute_cwd
+            end
+
+            return require('lspconfig.util').root_pattern('go.mod', '.git')(fname)
+          end,
+          settings = {
+            gopls = {
+              codelenses = { test = true },
+              analyses = {
+                unusedparams = true,
+              },
+              staticcheck = true,
+              gofumpt = true,
+              hints = {
+                assignVariableTypes = true,
+                compositeLiteralFields = true,
+                compositeLiteralTypes = true,
+                constantValues = true,
+                functionTypeParameters = true,
+                parameterNames = true,
+                rangeVariableTypes = true,
+              } or nil,
+            },
+          },
+
+          flags = {
+            debounce_text_changes = 200,
+          },
+        },
+        pyright = {},
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -541,8 +586,7 @@ require('lazy').setup {
         --    https://github.com/pmizio/typescript-tools.nvim
         --
         -- But for many setups, the LSP (`tsserver`) will work just fine
-        -- tsserver = {},
-        --
+        tsserver = {},
 
         lua_ls = {
           -- cmd = {...},
@@ -614,11 +658,13 @@ require('lazy').setup {
       formatters_by_ft = {
         lua = { 'stylua' },
         -- Conform can also run multiple formatters sequentially
-        -- python = { "isort", "black" },
+        python = { 'isort', 'black' },
         --
         -- You can use a sub-list to tell conform to run *until* a formatter
         -- is found.
-        -- javascript = { { "prettierd", "prettier" } },
+        javascript = { { 'prettierd', 'prettier' } },
+        -- go = { 'goimports', 'gofmt' },
+        rust = { 'rustfmt' },
       },
     },
   },
@@ -724,13 +770,13 @@ require('lazy').setup {
     'folke/tokyonight.nvim',
     lazy = false, -- make sure we load this during startup if it is your main colorscheme
     priority = 1000, -- make sure to load this before all the other start plugins
-    config = function()
-      -- Load the colorscheme here
-      vim.cmd.colorscheme 'tokyonight-night'
-
-      -- You can configure highlights by doing something like
-      vim.cmd.hi 'Comment gui=none'
-    end,
+    -- config = function()
+    --   -- Load the colorscheme here
+    --   vim.cmd.colorscheme 'tokyonight-night'
+    --
+    --   -- You can configure highlights by doing something like
+    --   vim.cmd.hi 'Comment gui=none'
+    -- end,
   },
 
   -- Highlight todo, notes, etc in comments
@@ -813,9 +859,10 @@ require('lazy').setup {
   --    This is the easiest way to modularize your config.
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
-  --    For additional information, see `:help lazy.nvim-lazy.nvim-structuring-your-plugins`
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
 }
+
+require 'custom.go'
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
